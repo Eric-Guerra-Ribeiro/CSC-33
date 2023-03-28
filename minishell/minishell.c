@@ -2,19 +2,29 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #define MAX_LENGTH 256
-#define MAX_NUM_ARGS 16
+#define MAX_NUM_ARGS 15
+
+#define STDIN 0
+#define STDOUT 1
+
+#define INPUT 0
+#define OUTPUT 1
 
 typedef struct command command;
+typedef int io_device;
 
 struct command {
     char program[MAX_LENGTH];
     int argc;
-    char argv[MAX_NUM_ARGS][MAX_LENGTH];
-    char input[MAX_LENGTH];
-    char output[MAX_LENGTH];
+    char argv[MAX_NUM_ARGS + 1][MAX_LENGTH];
+    io_device input;
+    io_device output;
 };
 
 
@@ -22,8 +32,8 @@ command empty_command() {
     command cmd;
     strcpy(cmd.program, "");
     cmd.argc = 0;
-    strcpy(cmd.input, "");
-    strcpy(cmd.output, "");
+    cmd.input = STDIN;
+    cmd.output = STDOUT;
 }
 
 
@@ -36,18 +46,24 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
     bool read_out = false;
 
     word = strtok(cmd_line, " \n");
-    cmd.argc = 0;
+    cmd.argc = 1;
     // Empty command
     if (word == NULL) {    
         return empty_command();
     }
     // Non-empty command
     strcpy(cmd.program, word);
+    strcpy(cmd.argv[0], cmd.program);
     word = strtok(NULL, " \n");
     while (word != NULL) {
         // Reading input redirect
-        if (!read_in && strcmp(word, "<") == 0) {
-            // Checking if has read the arguments
+        if (strcmp(word, "<") == 0) {
+            // More than one input file
+            if (read_in) {
+                printf("Error: More than one input file.\n");
+                return empty_command();
+            }
+            // Checking if the arguments have been read
             finish_read_args = start_read_args;
             // Reading input file
             read_in = true;
@@ -57,10 +73,15 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
                 printf("Error: No input file.\n");
                 return empty_command();
             }
-            strcpy(cmd.input, word);
+            cmd.input = open(word, O_RDONLY);
         }
         // Reading output redirect
-        else if (!read_out && strcmp(word, ">")) {
+        else if (strcmp(word, ">") == 0) {
+            // More than one output file
+            if (read_out) {
+                printf("Error: More than one output file.\n");
+                return empty_command();
+            }
             // Checking if the arguments have been read
             finish_read_args = start_read_args;
             // Reading output file
@@ -71,7 +92,7 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
                 printf("Error: No output file.\n");
                 return empty_command();
             }
-            strcpy(cmd.output, word);
+            cmd.output = open(word, O_WRONLY);
         }
         // Read arguments
         else if (!finish_read_args) {
@@ -84,17 +105,53 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
         }
         word = strtok(NULL, " \n");
     }
+    // Standard I/O
+    if (!read_in) {
+        cmd.input = STDIN;
+    }
+    if (!read_out) {
+        cmd.output = STDOUT;
+    }
+    // End argv
+    // TODO fix argv to end in NULL
+    // strcpy(cmd.argv[cmd.argc], NULL);
+
     return cmd;
 }
+
 
 int main() {
     char cmd_line[MAX_LENGTH];
     command cmd;
-    do {
-        // Reads the command line
+    pid_t pid;
+    while (true) {
+        // Reads the command
         fgets(cmd_line, MAX_LENGTH, stdin);
-        // TODO Finish shell logic
-    } while (1);
+        cmd = parse_cmd(cmd_line);
+        // Invalid command
+        if (strcmp(cmd.program, "") == 0) {
+            continue;
+        }
+        // Exit
+        if (strcmp(cmd.program, "exit") == 0) {
+            break;
+        }
+        // Create child process to run command
+        pid = fork();
+        // Shell waits for process to finish
+        if (pid != 0) {
+            // TODO fix wait
+            wait(pid);
+        }
+        // Child process runs the command
+        else {
+            dup2(cmd.input, INPUT);
+            dup2(cmd.output, OUTPUT);
+            // TODO fix argv
+            execv(cmd.program, cmd.argv);
+        }
+
+    };
 
     return 0;
 }
