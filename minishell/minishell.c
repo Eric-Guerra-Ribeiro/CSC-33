@@ -74,7 +74,7 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
             strcpy(cmd.output, word);
         }
         // Read arguments
-        else if (!start_read_args || !finish_read_args) {
+        else if (!finish_read_args) {
             start_read_args = true;
             strcpy(cmd.argv[cmd.argc++], word);
         }
