@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <sys/types.h>
@@ -22,7 +23,7 @@ typedef int io_device;
 struct command {
     char program[MAX_LENGTH];
     int argc;
-    char argv[MAX_NUM_ARGS + 1][MAX_LENGTH];
+    char *argv[MAX_NUM_ARGS + 1];
     io_device input;
     io_device output;
 };
@@ -53,7 +54,8 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
     }
     // Non-empty command
     strcpy(cmd.program, word);
-    strcpy(cmd.argv[0], cmd.program);
+    cmd.argv[0] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
+    strcpy(cmd.argv[0], word);
     word = strtok(NULL, " \n");
     while (word != NULL) {
         // Reading input redirect
@@ -97,10 +99,12 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
         // Read arguments
         else if (!finish_read_args) {
             start_read_args = true;
+            cmd.argv[cmd.argc] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
             strcpy(cmd.argv[cmd.argc++], word);
         }
         // Extra arguments are ignored
         else {
+            printf("Warning: extra arguments were ignored.");
             break;
         }
         word = strtok(NULL, " \n");
@@ -112,9 +116,6 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
     if (!read_out) {
         cmd.output = STDOUT;
     }
-    // End argv
-    // TODO fix argv to end in NULL
-    // strcpy(cmd.argv[cmd.argc], NULL);
 
     return cmd;
 }
@@ -125,6 +126,7 @@ int main() {
     command cmd;
     pid_t pid;
     while (true) {
+        printf("$ ");
         // Reads the command
         fgets(cmd_line, MAX_LENGTH, stdin);
         cmd = parse_cmd(cmd_line);
@@ -138,19 +140,17 @@ int main() {
         }
         // Create child process to run command
         pid = fork();
-        // Shell waits for process to finish
+        // Shell waits for child process to finish
         if (pid != 0) {
-            // TODO fix wait
-            wait(pid);
+            wait(NULL);
         }
         // Child process runs the command
         else {
             dup2(cmd.input, INPUT);
             dup2(cmd.output, OUTPUT);
-            // TODO fix argv
             execv(cmd.program, cmd.argv);
+            exit(0);
         }
-
     };
 
     return 0;
