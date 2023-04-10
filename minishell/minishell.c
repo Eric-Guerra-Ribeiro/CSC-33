@@ -128,7 +128,11 @@ int main() {
     while (true) {
         printf("$ ");
         // Reads the command
-        fgets(cmd_line, MAX_LENGTH, stdin);
+        // Null happens when EOF
+        if(fgets(cmd_line, MAX_LENGTH, stdin) == NULL) {
+            printf("\n");
+            break;
+        }
         cmd = parse_cmd(cmd_line);
         // Invalid command
         if (strcmp(cmd.program, "") == 0) {
