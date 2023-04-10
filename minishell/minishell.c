@@ -49,7 +49,7 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
     word = strtok(cmd_line, " \n");
     cmd.argc = 1;
     // Empty command
-    if (word == NULL) {    
+    if (word == NULL) {
         return empty_command();
     }
     // Non-empty command
@@ -116,7 +116,10 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
     if (!read_out) {
         cmd.output = STDOUT;
     }
-
+    // End argv with NULLs
+    for (int i = cmd.argc; i <= MAX_NUM_ARGS + 1; ++i) {
+        cmd.argv[i] = NULL;
+    }
     return cmd;
 }
 
@@ -147,6 +150,12 @@ int main() {
         // Shell waits for child process to finish
         if (pid != 0) {
             wait(NULL);
+            // free argv
+            for (int i = 0; i < cmd.argc; ++i) {
+                if (cmd.argv[i] != NULL) {
+                    free(cmd.argv[i]);
+                }
+            }
         }
         // Child process runs the command
         else {
