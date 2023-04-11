@@ -35,6 +35,7 @@ command empty_command() {
     cmd.argc = 0;
     cmd.input = STDIN;
     cmd.output = STDOUT;
+    return cmd;
 }
 
 
