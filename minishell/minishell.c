@@ -11,21 +11,17 @@
 #define MAX_LENGTH 256
 #define MAX_NUM_ARGS 15
 
-#define STDIN 0
-#define STDOUT 1
-
 #define INPUT 0
 #define OUTPUT 1
 
 typedef struct command command;
-typedef int io_device;
 
 struct command {
     char program[MAX_LENGTH];
     int argc;
     char *argv[MAX_NUM_ARGS + 1];
-    io_device input;
-    io_device output;
+    char *input;
+    char *output;
 };
 
 
@@ -33,8 +29,8 @@ command empty_command() {
     command cmd;
     strcpy(cmd.program, "");
     cmd.argc = 0;
-    cmd.input = STDIN;
-    cmd.output = STDOUT;
+    cmd.input = NULL;
+    cmd.output = NULL;
     return cmd;
 }
 
@@ -61,13 +57,13 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
     while (word != NULL) {
         // Reading input redirect
         if (strcmp(word, "<") == 0) {
+            // Checking if the arguments have been read
+            finish_read_args = start_read_args;
             // More than one input file
             if (read_in) {
                 printf("Error: More than one input file.\n");
                 return empty_command();
             }
-            // Checking if the arguments have been read
-            finish_read_args = start_read_args;
             // Reading input file
             read_in = true;
             word = strtok(NULL, " \n");
@@ -76,17 +72,18 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
                 printf("Error: No input file.\n");
                 return empty_command();
             }
-            cmd.input = open(word, O_RDONLY);
+            cmd.input = (char *) malloc(sizeof(char *)*(strlen(word) + 1));
+            strcpy(cmd.input, word);
         }
         // Reading output redirect
         else if (strcmp(word, ">") == 0) {
+            // Checking if the arguments have been read
+            finish_read_args = start_read_args;
             // More than one output file
             if (read_out) {
                 printf("Error: More than one output file.\n");
                 return empty_command();
             }
-            // Checking if the arguments have been read
-            finish_read_args = start_read_args;
             // Reading output file
             read_out = true;
             word = strtok(NULL, " \n");
@@ -95,7 +92,8 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
                 printf("Error: No output file.\n");
                 return empty_command();
             }
-            cmd.output = open(word, O_WRONLY);
+            cmd.output = (char *) malloc(sizeof(char *)*(strlen(word) + 1));
+            strcpy(cmd.output, word);
         }
         // Read arguments
         else if (!finish_read_args) {
@@ -105,22 +103,20 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
         }
         // Extra arguments are ignored
         else {
-            printf("Warning: extra arguments were ignored.");
+            printf("Warning: extra arguments were ignored.\n");
             break;
         }
         word = strtok(NULL, " \n");
     }
-    // Standard I/O
+    // Standard I/O if input or output are NULL
     if (!read_in) {
-        cmd.input = STDIN;
+        cmd.input = NULL;
     }
     if (!read_out) {
-        cmd.output = STDOUT;
+        cmd.output = NULL;
     }
     // End argv with NULLs
-    for (int i = cmd.argc; i <= MAX_NUM_ARGS + 1; ++i) {
-        cmd.argv[i] = NULL;
-    }
+    cmd.argv[cmd.argc] = NULL;
     return cmd;
 }
 
@@ -129,6 +125,9 @@ int main() {
     char cmd_line[MAX_LENGTH];
     command cmd;
     pid_t pid;
+    int input_fd;
+    int output_fd;
+
     while (true) {
         printf("$ ");
         // Reads the command
@@ -153,17 +152,44 @@ int main() {
             wait(NULL);
             // free argv
             for (int i = 0; i < cmd.argc; ++i) {
-                if (cmd.argv[i] != NULL) {
-                    free(cmd.argv[i]);
-                }
+                free(cmd.argv[i]);
+            }
+            // free input and output string names
+            if (cmd.input != NULL) {
+                free(cmd.input);
+            }
+            if (cmd.output != NULL) {
+                free(cmd.output);
             }
         }
         // Child process runs the command
         else {
-            dup2(cmd.input, INPUT);
-            dup2(cmd.output, OUTPUT);
-            execv(cmd.program, cmd.argv);
-            exit(0);
+            // TODO close files
+            // Redirecting input
+            if (cmd.input != NULL) {
+                input_fd = open(cmd.input, O_RDONLY);
+                if (dup2(input_fd, INPUT) == -1) {
+                    close(input_fd);
+                    printf("Error redirecting input.\n");
+                    exit(0);
+                }
+                close(input_fd);
+            }
+            // Redirecting output
+            if (cmd.output != NULL) {
+                output_fd = open(cmd.output, O_WRONLY);
+                if (dup2(output_fd, OUTPUT) == -1) {
+                    close(output_fd);
+                    printf("Error redirecting output.\n");
+                    exit(0);
+                }
+                close(output_fd);
+            }
+            // Executing program
+            if (execv(cmd.program, cmd.argv) == -1) {
+                printf("Error: command not found.\n");
+                exit(0);
+            }
         }
     };
 
