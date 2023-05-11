@@ -1,7 +1,7 @@
 all: minishell
 
 minishell: minishell.c
-	@gcc minishell.c -o minishell.exe
+	@gcc -o minishell.exe minishell.c command.c
 
 clean:
 	@rm -f minishell.exe
