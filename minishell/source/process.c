@@ -1,33 +1,40 @@
 #include "process.h"
 
-process empty_process() {
-    process proc;
-    strcpy(proc.program, "");
-    proc.argc = 0;
-    proc.infile = STDIN_FILENO;
-    proc.outfile = STDOUT_FILENO;
+process* empty_process() {
+    process* proc = (process *) malloc(sizeof(process));
+    proc->pid = (pid_t) 0;
+    proc->argc = 0;
+    proc->infile = STDIN_FILENO;
+    proc->outfile = STDOUT_FILENO;
+    proc->argv[proc->argc] = (char *) malloc(sizeof(char)*(1));
+    strcpy(proc->argv[proc->argc++], "");
+    proc->next = NULL;
     return proc;
 }
 
 
-process parse_proc(char cmd_line[MAX_LENGTH]) {
-    process proc;
-    char *word;
+process* parse_cmd(char* cmd_line) {
+    return parse_process(cmd_line);
+}
+
+process* parse_process(char* process_line) {
+    char* word;
     bool start_read_args = false;
     bool finish_read_args = false;
     bool read_in = false;
     bool read_out = false;
 
-    word = strtok(cmd_line, " \n");
-    proc.argc = 1;
+    word = strtok(process_line, " \n");
     // Empty process
     if (word == NULL) {
         return empty_process();
     }
     // Non-empty process
-    strcpy(proc.program, word);
-    proc.argv[0] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
-    strcpy(proc.argv[0], word);
+    process* proc = (process *) malloc(sizeof(process));
+    proc->argc = 1;
+    proc->pid = (pid_t) 0;
+    proc->argv[0] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
+    strcpy(proc->argv[0], word);
     word = strtok(NULL, " \n");
     while (word != NULL) {
         // Reading input redirect
@@ -47,7 +54,7 @@ process parse_proc(char cmd_line[MAX_LENGTH]) {
                 printf("Error: No input file.\n");
                 return empty_process();
             }
-            proc.infile = open(word, O_RDONLY);
+            proc->infile = open(word, O_RDONLY);
         }
         // Reading output redirect
         else if (strcmp(word, ">") == 0) {
@@ -66,13 +73,13 @@ process parse_proc(char cmd_line[MAX_LENGTH]) {
                 printf("Error: No output file.\n");
                 return empty_process();
             }
-            proc.outfile = open(word, O_WRONLY);
+            proc->outfile = open(word, O_WRONLY);
         }
         // Read arguments
         else if (!finish_read_args) {
             start_read_args = true;
-            proc.argv[proc.argc] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
-            strcpy(proc.argv[proc.argc++], word);
+            proc->argv[proc->argc] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
+            strcpy(proc->argv[proc->argc++], word);
         }
         // Extra arguments are ignored
         else {
@@ -83,12 +90,27 @@ process parse_proc(char cmd_line[MAX_LENGTH]) {
     }
     // Standard I/O if input or output were read
     if (!read_in) {
-        proc.infile = STDIN_FILENO;
+        proc->infile = STDIN_FILENO;
     }
     if (!read_out) {
-        proc.outfile = STDOUT_FILENO;
+        proc->outfile = STDOUT_FILENO;
     }
     // End argv with NULLs
-    proc.argv[proc.argc] = NULL;
+    proc->argv[proc->argc] = NULL;
+    // Set next process
+    proc->next = NULL;
     return proc;
+}
+
+void free_proc(process* first_proc) {
+    // free argvs
+    for (process* proc = first_proc; proc != NULL; proc = proc->next) {
+        for (int i = 0; i < proc->argc; ++i) {
+            free(proc->argv[i]);
+        }
+    }
+    // free process structs
+    for (process* proc = first_proc; proc != NULL; proc = proc->next) {
+        free(proc);
+    }
 }

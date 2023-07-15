@@ -8,20 +8,22 @@
 #include <stdbool.h>
 #include <fcntl.h>
 
-#define MAX_LENGTH 256
 #define MAX_NUM_ARGS 15
 
 typedef struct process process;
 
 struct process {
-    char program[MAX_LENGTH];
+    pid_t pid;
     int argc;
     char *argv[MAX_NUM_ARGS + 1];
     int infile;
     int outfile;
+    process* next;
 };
 
-process empty_command();
-process parse_proc(char cmd_line[MAX_LENGTH]);
+process* empty_process();
+process* parse_cmd(char* cmd_line);
+process* parse_process(char* process_line);
+void free_proc(process* first_proc);
 
 #endif // PROCESS_H

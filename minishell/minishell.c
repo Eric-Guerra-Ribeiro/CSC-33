@@ -9,12 +9,12 @@
 
 #include "source/process.h"
 
+#define MAX_LENGTH 256
 
 int main() {
     char cmd_line[MAX_LENGTH];
-    process proc;
+    process* proc;
     pid_t pid;
-
     while (true) {
         printf("$ ");
         // Reads the command
@@ -23,38 +23,44 @@ int main() {
             printf("\n");
             break;
         }
-        proc = parse_proc(cmd_line);
+        proc = parse_cmd(cmd_line);
         // Invalid command
-        if (strcmp(proc.program, "") == 0) {
+        if (strcmp(proc->argv[0], "") == 0) {
+            // free
+            free_proc(proc);
+            // Read next command
             continue;
         }
         // Exit
-        if (strcmp(proc.program, "exit") == 0) {
+        if (strcmp(proc->argv[0], "exit") == 0) {
+            // free
+            free_proc(proc);
+            // exit shell
             exit(0);
         }
         // Create child process to run command
         pid = fork();
         // Shell waits for child process to finish
         if (pid != 0) {
+            proc->pid = pid;
             wait(NULL);
-            // free argv
-            for (int i = 0; i < proc.argc; ++i) {
-                free(proc.argv[i]);
-            }
+            // free
+            free_proc(proc);
         }
         // Child process runs the command
         else {
             // Redirecting input
-            if (proc.infile != STDIN_FILENO) {
-                dup2(proc.infile, STDIN_FILENO);
-                close(proc.infile);
+            if (proc->infile != STDIN_FILENO) {
+                dup2(proc->infile, STDIN_FILENO);
+                close(proc->infile);
             }
             // Redirecting output
-            if (proc.outfile != STDOUT_FILENO) {
-                dup2(proc.outfile, STDOUT_FILENO);
+            if (proc->outfile != STDOUT_FILENO) {
+                dup2(proc->outfile, STDOUT_FILENO);
+                close(proc->outfile);
             }
             // Executing program
-            if (execv(proc.program, proc.argv) == -1) {
+            if (execv(proc->argv[0], proc->argv) == -1) {
                 printf("Error: command not found.\n");
                 exit(0);
             }
