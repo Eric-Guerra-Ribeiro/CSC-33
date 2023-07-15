@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "command.h"
+#include "source/command.h"
 
 #define INPUT 0
 #define OUTPUT 1
