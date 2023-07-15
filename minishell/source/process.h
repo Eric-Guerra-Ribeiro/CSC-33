@@ -9,6 +9,7 @@
 #include <fcntl.h>
 
 #define MAX_NUM_ARGS 15
+#define MAX_PIPE_DEPTH 32
 
 typedef struct process process;
 
@@ -21,7 +22,6 @@ struct process {
     process* next;
 };
 
-process* empty_process();
 process* parse_cmd(char* cmd_line);
 process* parse_process(char* process_line);
 void free_proc(process* first_proc);

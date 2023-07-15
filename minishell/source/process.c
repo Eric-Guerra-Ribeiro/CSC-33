@@ -1,35 +1,57 @@
 #include "process.h"
 
-process* empty_process() {
-    process* proc = (process *) malloc(sizeof(process));
-    proc->pid = (pid_t) 0;
-    proc->argc = 0;
-    proc->infile = STDIN_FILENO;
-    proc->outfile = STDOUT_FILENO;
-    proc->argv[proc->argc] = (char *) malloc(sizeof(char)*(1));
-    strcpy(proc->argv[proc->argc++], "");
-    proc->next = NULL;
-    return proc;
-}
-
-
 process* parse_cmd(char* cmd_line) {
-    return parse_process(cmd_line);
+    process* first_proc;
+    process* proc;
+    process* prev_proc;
+    char *word;
+    char* process_words[MAX_PIPE_DEPTH];
+    int pipe_depth = 0;
+    // Parse command into pipelines of processes
+    word = strtok(cmd_line, "|");
+    while (word != NULL) {
+        process_words[pipe_depth] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
+        strcpy(process_words[pipe_depth++], word);
+        word = strtok(NULL, "|");
+    }
+    // Parse each process in pipeline
+    if (pipe_depth > 0) {
+        first_proc = parse_process(process_words[0]);
+        prev_proc = first_proc;
+        proc = first_proc;
+        for (int i = 1; i < pipe_depth; ++i) {
+            if (proc == NULL) {
+                break;
+            }
+            proc = parse_process(process_words[i]);
+            prev_proc->next = proc;
+            prev_proc = proc;
+        }
+    }
+    else {
+        first_proc = NULL;
+    }
+    // Free process words
+    for (int i = 0; i < pipe_depth; ++i) {
+        free(process_words[i]);
+    }
+    return first_proc;
 }
 
-process* parse_process(char* process_line) {
+
+process* parse_process(char* process_str) {
     char* word;
     bool start_read_args = false;
     bool finish_read_args = false;
     bool read_in = false;
     bool read_out = false;
 
-    word = strtok(process_line, " \n");
-    // Empty process
+    word = strtok(process_str, " \n");
+    // Null process
     if (word == NULL) {
-        return empty_process();
+        return NULL;
     }
-    // Non-empty process
+    // Non-null process
     process* proc = (process *) malloc(sizeof(process));
     proc->argc = 1;
     proc->pid = (pid_t) 0;
@@ -44,7 +66,7 @@ process* parse_process(char* process_line) {
             // More than one input file
             if (read_in) {
                 printf("Error: More than one input file.\n");
-                return empty_process();
+                return NULL;
             }
             // Reading input file
             read_in = true;
@@ -52,7 +74,7 @@ process* parse_process(char* process_line) {
             // No input file given
             if (word == NULL) {
                 printf("Error: No input file.\n");
-                return empty_process();
+                return NULL;
             }
             proc->infile = open(word, O_RDONLY);
         }
@@ -63,7 +85,7 @@ process* parse_process(char* process_line) {
             // More than one output file
             if (read_out) {
                 printf("Error: More than one output file.\n");
-                return empty_process();
+                return NULL;
             }
             // Reading output file
             read_out = true;
@@ -71,7 +93,7 @@ process* parse_process(char* process_line) {
             if (word == NULL) {
                 // No output file given
                 printf("Error: No output file.\n");
-                return empty_process();
+                return NULL;
             }
             proc->outfile = open(word, O_WRONLY);
         }
@@ -102,15 +124,20 @@ process* parse_process(char* process_line) {
     return proc;
 }
 
+
 void free_proc(process* first_proc) {
-    // free argvs
-    for (process* proc = first_proc; proc != NULL; proc = proc->next) {
-        for (int i = 0; i < proc->argc; ++i) {
-            free(proc->argv[i]);
+    process* proc;
+    process* prev_proc;
+    proc = first_proc;
+    while (proc != NULL) {
+        prev_proc = proc;
+        // free argvs
+        for (int i = 0; i < prev_proc->argc; ++i) {
+            free(prev_proc->argv[i]);
         }
-    }
-    // free process structs
-    for (process* proc = first_proc; proc != NULL; proc = proc->next) {
-        free(proc);
+        // free process struct
+        free(prev_proc);
+
+        proc = prev_proc->next;
     }
 }

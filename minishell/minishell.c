@@ -25,9 +25,7 @@ int main() {
         }
         proc = parse_cmd(cmd_line);
         // Invalid command
-        if (strcmp(proc->argv[0], "") == 0) {
-            // free
-            free_proc(proc);
+        if (proc == NULL) {
             // Read next command
             continue;
         }
