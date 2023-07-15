@@ -7,6 +7,7 @@ process* parse_cmd(char* cmd_line) {
     char *word;
     char* process_words[MAX_PIPE_DEPTH];
     int pipe_depth = 0;
+    int pipefd[2];
     // Parse command into pipelines of processes
     word = strtok(cmd_line, "|");
     while (word != NULL) {
@@ -26,6 +27,14 @@ process* parse_cmd(char* cmd_line) {
             proc = parse_process(process_words[i]);
             prev_proc->next = proc;
             prev_proc = proc;
+        }
+        // Connect I/O of pipe on each other
+        proc = first_proc;
+        for (int i = 1; i < pipe_depth; ++i) {
+            pipe(pipefd);
+            proc->outfile = pipefd[1];
+            proc = proc->next;
+            proc->infile = pipefd[0];
         }
     }
     else {

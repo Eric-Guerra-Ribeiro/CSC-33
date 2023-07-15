@@ -40,28 +40,39 @@ int main() {
         pid = fork();
         // Shell waits for child process to finish
         if (pid != 0) {
-            proc->pid = pid;
             wait(NULL);
             // free
             free_proc(proc);
         }
         // Child process runs the command
         else {
-            // Redirecting input
-            if (proc->infile != STDIN_FILENO) {
-                dup2(proc->infile, STDIN_FILENO);
-                close(proc->infile);
+            while (proc != NULL) {
+                pid = fork();
+                // Child process runs the request process
+                if (pid == 0) {
+                    // Redirecting input
+                    if (proc->infile != STDIN_FILENO) {
+                        dup2(proc->infile, STDIN_FILENO);
+                        close(proc->infile);
+                    }
+                    // Redirecting output
+                    if (proc->outfile != STDOUT_FILENO) {
+                        dup2(proc->outfile, STDOUT_FILENO);
+                        close(proc->outfile);
+                    }
+                    // Executing program
+                    if (execv(proc->argv[0], proc->argv) == -1) {
+                        printf("Error: command not found.\n");
+                        exit(0);
+                    }
+                }
+                // Father process goes to the next
+                else {
+                    wait(NULL);
+                    proc = proc->next;
+                }
             }
-            // Redirecting output
-            if (proc->outfile != STDOUT_FILENO) {
-                dup2(proc->outfile, STDOUT_FILENO);
-                close(proc->outfile);
-            }
-            // Executing program
-            if (execv(proc->argv[0], proc->argv) == -1) {
-                printf("Error: command not found.\n");
-                exit(0);
-            }
+            exit(0);
         }
     };
 
