@@ -1,17 +1,17 @@
-#include "command.h"
+#include "process.h"
 
-command empty_command() {
-    command cmd;
-    strcpy(cmd.program, "");
-    cmd.argc = 0;
-    cmd.input = NULL;
-    cmd.output = NULL;
-    return cmd;
+process empty_process() {
+    process proc;
+    strcpy(proc.program, "");
+    proc.argc = 0;
+    proc.infile = STDIN_FILENO;
+    proc.outfile = STDOUT_FILENO;
+    return proc;
 }
 
 
-command parse_cmd(char cmd_line[MAX_LENGTH]) {
-    command cmd;
+process parse_proc(char cmd_line[MAX_LENGTH]) {
+    process proc;
     char *word;
     bool start_read_args = false;
     bool finish_read_args = false;
@@ -19,15 +19,15 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
     bool read_out = false;
 
     word = strtok(cmd_line, " \n");
-    cmd.argc = 1;
-    // Empty command
+    proc.argc = 1;
+    // Empty process
     if (word == NULL) {
-        return empty_command();
+        return empty_process();
     }
-    // Non-empty command
-    strcpy(cmd.program, word);
-    cmd.argv[0] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
-    strcpy(cmd.argv[0], word);
+    // Non-empty process
+    strcpy(proc.program, word);
+    proc.argv[0] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
+    strcpy(proc.argv[0], word);
     word = strtok(NULL, " \n");
     while (word != NULL) {
         // Reading input redirect
@@ -37,7 +37,7 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
             // More than one input file
             if (read_in) {
                 printf("Error: More than one input file.\n");
-                return empty_command();
+                return empty_process();
             }
             // Reading input file
             read_in = true;
@@ -45,10 +45,9 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
             // No input file given
             if (word == NULL) {
                 printf("Error: No input file.\n");
-                return empty_command();
+                return empty_process();
             }
-            cmd.input = (char *) malloc(sizeof(char *)*(strlen(word) + 1));
-            strcpy(cmd.input, word);
+            proc.infile = open(word, O_RDONLY);
         }
         // Reading output redirect
         else if (strcmp(word, ">") == 0) {
@@ -57,7 +56,7 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
             // More than one output file
             if (read_out) {
                 printf("Error: More than one output file.\n");
-                return empty_command();
+                return empty_process();
             }
             // Reading output file
             read_out = true;
@@ -65,16 +64,15 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
             if (word == NULL) {
                 // No output file given
                 printf("Error: No output file.\n");
-                return empty_command();
+                return empty_process();
             }
-            cmd.output = (char *) malloc(sizeof(char *)*(strlen(word) + 1));
-            strcpy(cmd.output, word);
+            proc.outfile = open(word, O_WRONLY);
         }
         // Read arguments
         else if (!finish_read_args) {
             start_read_args = true;
-            cmd.argv[cmd.argc] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
-            strcpy(cmd.argv[cmd.argc++], word);
+            proc.argv[proc.argc] = (char *) malloc(sizeof(char)*(strlen(word) + 1));
+            strcpy(proc.argv[proc.argc++], word);
         }
         // Extra arguments are ignored
         else {
@@ -83,14 +81,14 @@ command parse_cmd(char cmd_line[MAX_LENGTH]) {
         }
         word = strtok(NULL, " \n");
     }
-    // Standard I/O if input or output are NULL
+    // Standard I/O if input or output were read
     if (!read_in) {
-        cmd.input = NULL;
+        proc.infile = STDIN_FILENO;
     }
     if (!read_out) {
-        cmd.output = NULL;
+        proc.outfile = STDOUT_FILENO;
     }
     // End argv with NULLs
-    cmd.argv[cmd.argc] = NULL;
-    return cmd;
+    proc.argv[proc.argc] = NULL;
+    return proc;
 }

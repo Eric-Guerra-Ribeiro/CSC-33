@@ -7,17 +7,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "source/command.h"
+#include "source/process.h"
 
-#define INPUT 0
-#define OUTPUT 1
 
 int main() {
     char cmd_line[MAX_LENGTH];
-    command cmd;
+    process proc;
     pid_t pid;
-    int input_fd;
-    int output_fd;
 
     while (true) {
         printf("$ ");
@@ -27,14 +23,14 @@ int main() {
             printf("\n");
             break;
         }
-        cmd = parse_cmd(cmd_line);
+        proc = parse_proc(cmd_line);
         // Invalid command
-        if (strcmp(cmd.program, "") == 0) {
+        if (strcmp(proc.program, "") == 0) {
             continue;
         }
         // Exit
-        if (strcmp(cmd.program, "exit") == 0) {
-            break;
+        if (strcmp(proc.program, "exit") == 0) {
+            exit(0);
         }
         // Create child process to run command
         pid = fork();
@@ -42,41 +38,23 @@ int main() {
         if (pid != 0) {
             wait(NULL);
             // free argv
-            for (int i = 0; i < cmd.argc; ++i) {
-                free(cmd.argv[i]);
-            }
-            // free input and output string names
-            if (cmd.input != NULL) {
-                free(cmd.input);
-            }
-            if (cmd.output != NULL) {
-                free(cmd.output);
+            for (int i = 0; i < proc.argc; ++i) {
+                free(proc.argv[i]);
             }
         }
         // Child process runs the command
         else {
             // Redirecting input
-            if (cmd.input != NULL) {
-                input_fd = open(cmd.input, O_RDONLY);
-                if (dup2(input_fd, INPUT) == -1) {
-                    close(input_fd);
-                    printf("Error redirecting input.\n");
-                    exit(0);
-                }
-                close(input_fd);
+            if (proc.infile != STDIN_FILENO) {
+                dup2(proc.infile, STDIN_FILENO);
+                close(proc.infile);
             }
             // Redirecting output
-            if (cmd.output != NULL) {
-                output_fd = open(cmd.output, O_WRONLY);
-                if (dup2(output_fd, OUTPUT) == -1) {
-                    close(output_fd);
-                    printf("Error redirecting output.\n");
-                    exit(0);
-                }
-                close(output_fd);
+            if (proc.outfile != STDOUT_FILENO) {
+                dup2(proc.outfile, STDOUT_FILENO);
             }
             // Executing program
-            if (execv(cmd.program, cmd.argv) == -1) {
+            if (execv(proc.program, proc.argv) == -1) {
                 printf("Error: command not found.\n");
                 exit(0);
             }
